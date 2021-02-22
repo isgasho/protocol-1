@@ -27,6 +27,8 @@ type Server interface {
 	Initialized(ctx context.Context, params *InitializedParams) (err error)
 	Shutdown(ctx context.Context) (err error)
 	Exit(ctx context.Context) (err error)
+	LogTrace(ctx context.Context, params *LogTraceParams) error
+	SetTrace(ctx context.Context, params *SetTraceParams) error
 	WorkDoneProgressCreate(ctx context.Context, params *WorkDoneProgressCreateParams) error
 	WorkDoneProgressCancel(ctx context.Context, params *WorkDoneProgressCancelParams) error
 	CodeAction(ctx context.Context, params *CodeActionParams) (result []CodeAction, err error)
@@ -64,6 +66,26 @@ type Server interface {
 	TypeDefinition(ctx context.Context, params *TypeDefinitionParams) (result []Location, err error)
 	WillSave(ctx context.Context, params *WillSaveTextDocumentParams) (err error)
 	WillSaveWaitUntil(ctx context.Context, params *WillSaveTextDocumentParams) (result []TextEdit, err error)
+
+	PrepareCallHierarchy(ctx context.Context, params *CallHierarchyPrepareParams) ([]CallHierarchyItem /*CallHierarchyItem[] | null*/, error)
+	IncomingCalls(ctx context.Context, params *CallHierarchyIncomingCallsParams) ([]CallHierarchyIncomingCall /*CallHierarchyIncomingCall[] | null*/, error)
+	OutgoingCalls(ctx context.Context, params *CallHierarchyOutgoingCallsParams) ([]CallHierarchyOutgoingCall /*CallHierarchyOutgoingCall[] | null*/, error)
+
+	// DidCreateFiles(context.Context, *CreateFilesParams) error
+	// DidRenameFiles(context.Context, *RenameFilesParams) error
+	// DidDeleteFiles(context.Context, *DeleteFilesParams) error
+	// SemanticTokensRefresh(context.Context) error
+	// ShowDocument(context.Context, *ShowDocumentParams) (*ShowDocumentResult, error)
+	// CodeLensRefresh(context.Context) error
+	// WillCreateFiles(context.Context, *CreateFilesParams) (*WorkspaceEdit /*WorkspaceEdit | null*/, error)
+	// WillRenameFiles(context.Context, *RenameFilesParams) (*WorkspaceEdit /*WorkspaceEdit | null*/, error)
+	// WillDeleteFiles(context.Context, *DeleteFilesParams) (*WorkspaceEdit /*WorkspaceEdit | null*/, error)
+	// SemanticTokensFull(context.Context, *SemanticTokensParams) (*SemanticTokens /*SemanticTokens | null*/, error)
+	// SemanticTokensFullDelta(context.Context, *SemanticTokensDeltaParams) (interface{} /* SemanticTokens | SemanticTokensDelta | nil*/, error)
+	// SemanticTokensRange(context.Context, *SemanticTokensRangeParams) (*SemanticTokens /*SemanticTokens | null*/, error)
+	// LinkedEditingRange(context.Context, *LinkedEditingRangeParams) (*LinkedEditingRanges /*LinkedEditingRanges | null*/, error)
+	// Moniker(context.Context, *MonikerParams) ([]Moniker /*Moniker[] | null*/, error)
+
 	Request(ctx context.Context, method string, params interface{}) (interface{}, error)
 }
 
@@ -82,6 +104,12 @@ const (
 
 	// MethodExit method name of "exit".
 	MethodExit = "exit"
+
+	// MethodLogTrace method name of "$/logTrace".
+	MethodLogTrace = "$/logTrace"
+
+	// MethodSetTrace method name of "$/setTrace".
+	MethodSetTrace = "$/setTrace"
 
 	// MethodWorkDoneProgressCreate method name of "window/workDoneProgress/create".
 	MethodWorkDoneProgressCreate = "window/workDoneProgress/create"
@@ -196,6 +224,15 @@ const (
 
 	// MethodTextDocumentWillSaveWaitUntil method name of "textDocument/willSaveWaitUntil".
 	MethodTextDocumentWillSaveWaitUntil = "textDocument/willSaveWaitUntil"
+
+	// MethodTextDocumentPrepareCallHierarchy method name of "textDocument/prepareCallHierarchy".
+	MethodTextDocumentPrepareCallHierarchy = "textDocument/prepareCallHierarchy"
+
+	// MethodCallHierarchyIncomingCalls method name of "callHierarchy/incomingCalls".
+	MethodCallHierarchyIncomingCalls = "callHierarchy/incomingCalls"
+
+	// MethodCallHierarchyOutgoingCalls method name of "callHierarchy/outgoingCalls".
+	MethodCallHierarchyOutgoingCalls = "callHierarchy/outgoingCalls"
 )
 
 // server implements a Language Server Protocol server.
@@ -264,6 +301,27 @@ func (s *server) Exit(ctx context.Context) (err error) {
 	defer s.logger.Debug("end "+MethodExit, zap.Error(err))
 
 	return s.Conn.Notify(ctx, MethodExit, nil)
+}
+
+// LogTrace a notification to log the trace of the server’s execution.
+//
+// The amount and content of these notifications depends on the current trace configuration.
+//
+// If trace is "off", the server should not send any logTrace notification. If trace is "message",
+// the server should not add the "verbose" field in the LogTraceParams.
+func (s *server) LogTrace(ctx context.Context, params *LogTraceParams) (err error) {
+	s.logger.Debug("notify " + MethodLogTrace)
+	defer s.logger.Debug("end "+MethodLogTrace, zap.Error(err))
+
+	return s.Conn.Notify(ctx, MethodLogTrace, params)
+}
+
+// SetTrace a notification that should be used by the client to modify the trace setting of the server.
+func (s *server) SetTrace(ctx context.Context, params *SetTraceParams) (err error) {
+	s.logger.Debug("notify " + MethodSetTrace)
+	defer s.logger.Debug("end "+MethodSetTrace, zap.Error(err))
+
+	return s.Conn.Notify(ctx, MethodSetTrace, params)
 }
 
 // WorkDoneProgressCreate sends the request is sent from the server to the client to ask the client to create a work done progress.
@@ -734,6 +792,36 @@ func (s *server) WillSaveWaitUntil(ctx context.Context, params *WillSaveTextDocu
 	defer s.logger.Debug("end "+MethodTextDocumentWillSaveWaitUntil, zap.Error(err))
 
 	if err := Call(ctx, s.Conn, MethodTextDocumentWillSaveWaitUntil, params, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *server) PrepareCallHierarchy(ctx context.Context, params *CallHierarchyPrepareParams) (result []CallHierarchyItem, err error) {
+	s.logger.Debug("call " + MethodTextDocumentPrepareCallHierarchy)
+	defer s.logger.Debug("end "+MethodTextDocumentPrepareCallHierarchy, zap.Error(err))
+
+	if err := Call(ctx, s.Conn, MethodTextDocumentPrepareCallHierarchy, params, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *server) IncomingCalls(ctx context.Context, params *CallHierarchyIncomingCallsParams) (result []CallHierarchyIncomingCall, err error) {
+	s.logger.Debug("call " + MethodCallHierarchyIncomingCalls)
+	defer s.logger.Debug("end "+MethodCallHierarchyIncomingCalls, zap.Error(err))
+
+	if err := Call(ctx, s.Conn, MethodCallHierarchyIncomingCalls, params, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *server) OutgoingCalls(ctx context.Context, params *CallHierarchyOutgoingCallsParams) (result []CallHierarchyOutgoingCall, err error) {
+	s.logger.Debug("call " + MethodCallHierarchyOutgoingCalls)
+	defer s.logger.Debug("end "+MethodCallHierarchyOutgoingCalls, zap.Error(err))
+
+	if err := Call(ctx, s.Conn, MethodCallHierarchyOutgoingCalls, params, &result); err != nil {
 		return nil, err
 	}
 	return result, nil

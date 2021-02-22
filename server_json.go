@@ -444,6 +444,36 @@ func serverDispatch(ctx context.Context, server Server, reply jsonrpc2.Replier, 
 		resp, err := server.WillSaveWaitUntil(ctx, &params)
 		return true, reply(ctx, resp, err)
 
+	case MethodTextDocumentPrepareCallHierarchy: // request
+		defer logger.Debug(MethodTextDocumentPrepareCallHierarchy, zap.Error(err))
+
+		var params CallHierarchyPrepareParams
+		if err := dec.Decode(&params); err != nil {
+			return true, replyParseError(ctx, reply, err)
+		}
+		resp, err := server.PrepareCallHierarchy(ctx, &params)
+		return true, reply(ctx, resp, err)
+
+	case MethodCallHierarchyIncomingCalls: // request
+		defer logger.Debug(MethodCallHierarchyIncomingCalls, zap.Error(err))
+
+		var params CallHierarchyIncomingCallsParams
+		if err := dec.Decode(&params); err != nil {
+			return true, replyParseError(ctx, reply, err)
+		}
+		resp, err := server.IncomingCalls(ctx, &params)
+		return true, reply(ctx, resp, err)
+
+	case MethodCallHierarchyOutgoingCalls: // request
+		defer logger.Debug(MethodCallHierarchyOutgoingCalls, zap.Error(err))
+
+		var params CallHierarchyOutgoingCallsParams
+		if err := dec.Decode(&params); err != nil {
+			return true, replyParseError(ctx, reply, err)
+		}
+		resp, err := server.OutgoingCalls(ctx, &params)
+		return true, reply(ctx, resp, err)
+
 	default:
 		return false, nil
 	}

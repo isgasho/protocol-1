@@ -1144,13 +1144,13 @@ func testWorkspaceSymbolParams(t *testing.T, marshal marshalFunc, unmarshal unma
 				}
 
 				if workDoneToken := got.WorkDoneToken; workDoneToken != nil {
-					if diff := cmp.Diff(workDoneToken.String(), wantWorkDoneToken); (diff != "") != tt.wantErr {
+					if diff := cmp.Diff(workDoneToken, wantWorkDoneToken); (diff != "") != tt.wantErr {
 						t.Errorf("%s: wantErr: %t\n(-got, +want)\n%s", tt.name, tt.wantErr, diff)
 					}
 				}
 
 				if partialResultToken := got.PartialResultToken; partialResultToken != nil {
-					if diff := cmp.Diff(partialResultToken.String(), wantPartialResultToken); (diff != "") != tt.wantErr {
+					if diff := cmp.Diff(partialResultToken, wantPartialResultToken); (diff != "") != tt.wantErr {
 						t.Errorf("%s: wantErr: %t\n(-got, +want)\n%s", tt.name, tt.wantErr, diff)
 					}
 				}
@@ -1274,7 +1274,7 @@ func testExecuteCommandParams(t *testing.T, marshal marshalFunc, unmarshal unmar
 				}
 
 				if workDoneToken := got.WorkDoneToken; workDoneToken != nil {
-					if diff := cmp.Diff(workDoneToken.String(), wantWorkDoneToken); (diff != "") != tt.wantErr {
+					if diff := cmp.Diff(workDoneToken, wantWorkDoneToken); (diff != "") != tt.wantErr {
 						t.Errorf("%s: wantErr: %t\n(-got, +want)\n%s", tt.name, tt.wantErr, diff)
 					}
 				}
@@ -1408,7 +1408,7 @@ func testApplyWorkspaceEditParams(t *testing.T, marshal marshalFunc, unmarshal u
 						TextDocumentIdentifier: TextDocumentIdentifier{
 							URI: uri.File("/path/to/basic.go"),
 						},
-						Version: NewVersion(10),
+						Version: int32(10),
 					},
 					Edits: []TextEdit{
 						{
@@ -1454,7 +1454,7 @@ func testApplyWorkspaceEditParams(t *testing.T, marshal marshalFunc, unmarshal u
 						TextDocumentIdentifier: TextDocumentIdentifier{
 							URI: uri.File("/path/to/basic.go"),
 						},
-						Version: NewVersion(10),
+						Version: int32(10),
 					},
 					Edits: []TextEdit{
 						{
@@ -1573,11 +1573,13 @@ func testApplyWorkspaceEditParams(t *testing.T, marshal marshalFunc, unmarshal u
 
 func testApplyWorkspaceEditResponse(t *testing.T, marshal marshalFunc, unmarshal unmarshalFunc) {
 	const (
-		want        = `{"applied":true}`
+		want        = `{"applied":true,"failureReason":"testFailureReason","failedChange":1}`
 		wantInvalid = `{"applied":false}`
 	)
 	wantType := ApplyWorkspaceEditResponse{
-		Applied: true,
+		Applied:       true,
+		FailureReason: "testFailureReason",
+		FailedChange:  1,
 	}
 
 	t.Run("Marshal", func(t *testing.T) {

@@ -16,7 +16,7 @@ type ShowMessageParams struct {
 }
 
 // MessageType type of ShowMessageParams type.
-type MessageType float64
+type MessageType uint32
 
 const (
 	// Error an error message.
@@ -41,7 +41,7 @@ func (m MessageType) String() string {
 	case Log:
 		return "log"
 	default:
-		return strconv.FormatFloat(float64(m), 'f', -1, 64)
+		return strconv.FormatUint(uint64(m), 10)
 	}
 }
 

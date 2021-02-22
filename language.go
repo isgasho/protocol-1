@@ -6,8 +6,6 @@ package protocol
 
 import (
 	"strconv"
-
-	"go.lsp.dev/uri"
 )
 
 // CompletionParams params of Completion Request.
@@ -22,7 +20,7 @@ type CompletionParams struct {
 }
 
 // CompletionTriggerKind how a completion was triggered.
-type CompletionTriggerKind float64
+type CompletionTriggerKind uint32
 
 const (
 	// Invoked completion was triggered by typing an identifier (24x7 code
@@ -47,7 +45,7 @@ func (k CompletionTriggerKind) String() string {
 	case TriggerForIncompleteCompletions:
 		return "TriggerForIncompleteCompletions"
 	default:
-		return strconv.FormatFloat(float64(k), 'f', -10, 64)
+		return strconv.FormatUint(uint64(k), 10)
 	}
 }
 
@@ -74,7 +72,7 @@ type CompletionList struct {
 
 // InsertTextFormat defines whether the insert text in a completion item should be interpreted as
 // plain text or a snippet.
-type InsertTextFormat float64
+type InsertTextFormat uint32
 
 const (
 	// TextFormatPlainText is the primary text to be inserted is treated as a plain string.
@@ -97,7 +95,57 @@ func (tf InsertTextFormat) String() string {
 	case TextFormatSnippet:
 		return "Snippet"
 	default:
-		return strconv.FormatFloat(float64(tf), 'f', -10, 64)
+		return strconv.FormatUint(uint64(tf), 10)
+	}
+}
+
+// InsertReplaceEdit is a special text edit to provide an insert and a replace operation.
+//
+// @since 3.16.0.
+type InsertReplaceEdit struct {
+	// NewText is the string to be inserted.
+	NewText string `json:"newText"`
+
+	// Insert is the range if the insert is requested.
+	Insert Range `json:"insert"`
+
+	// Replace is the range if the replace is requested.
+	Replace Range `json:"replace"`
+}
+
+// InsertTextMode how whitespace and indentation is handled during completion
+// item insertion.
+//
+// @since 3.16.0.
+type InsertTextMode uint32
+
+const (
+	// AsIs is the insertion or replace strings is taken as it is. If the
+	// value is multi line the lines below the cursor will be
+	// inserted using the indentation defined in the string value.
+	// The client will not apply any kind of adjustments to the
+	// string.
+	InsertTextModeAsIs InsertTextMode = 1
+
+	// AdjustIndentation is the editor adjusts leading whitespace of new lines so that
+	// they match the indentation up to the cursor of the line for
+	// which the item is accepted.
+	//
+	// Consider a line like this: <2tabs><cursor><3tabs>foo. Accepting a
+	// multi line completion item is indented using 2 tabs and all
+	// following lines inserted will be indented using 2 tabs as well.
+	InsertTextModeAdjustIndentation InsertTextMode = 2
+)
+
+// String returns a string representation of the InsertTextMode.
+func (k InsertTextMode) String() string {
+	switch k {
+	case InsertTextModeAsIs:
+		return "AsIs"
+	case InsertTextModeAdjustIndentation:
+		return "AdjustIndentation"
+	default:
+		return strconv.FormatUint(uint64(k), 10)
 	}
 }
 
@@ -160,6 +208,13 @@ type CompletionItem struct {
 	// and the `newText` property of a provided `textEdit`.
 	InsertTextFormat InsertTextFormat `json:"insertTextFormat,omitempty"`
 
+	// InsertTextMode how whitespace and indentation is handled during completion
+	// item insertion. If not provided the client's default value depends on
+	// the `textDocument.completion.insertTextMode` client capability.
+	//
+	// @since 3.16.0.
+	InsertTextMode InsertTextMode `json:"insertTextMode,omitempty"`
+
 	// Kind is the kind of this completion item. Based of the kind
 	// an icon is chosen by the editor.
 	Kind CompletionItemKind `json:"kind,omitempty"`
@@ -183,9 +238,27 @@ type CompletionItem struct {
 	// TextEdit an edit which is applied to a document when selecting this completion. When an edit is provided the value of
 	// `insertText` is ignored.
 	//
-	// *Note:* The range of the edit must be a single line range and it must contain the position at which completion
+	// NOTE: The range of the edit must be a single line range and it must contain the position at which completion
 	// has been requested.
-	TextEdit *TextEdit `json:"textEdit,omitempty"`
+	//
+	// Most editors support two different operations when accepting a completion
+	// item. One is to insert a completion text and the other is to replace an
+	// existing text with a completion text. Since this can usually not be
+	// predetermined by a server it can report both ranges. Clients need to
+	// signal support for `InsertReplaceEdits` via the
+	// "textDocument.completion.insertReplaceSupport" client capability
+	// property.
+	//
+	// NOTE 1: The text edit's range as well as both ranges from an insert
+	// replace edit must be a [single line] and they must contain the position
+	// at which completion has been requested.
+	//
+	// NOTE 2: If an "InsertReplaceEdit" is returned the edit's insert range
+	// must be a prefix of the edit's replace range, that means it must be
+	// contained and starting at the same position.
+	//
+	// @since 3.16.0 additional type "InsertReplaceEdit".
+	TextEdit *TextEdit `json:"textEdit,omitempty"` // *TextEdit | *InsertReplaceEdit
 }
 
 // CompletionItemKind is the completion item kind values the client supports. When this
@@ -196,7 +269,7 @@ type CompletionItem struct {
 // If this property is not present the client only supports
 // the completion items kinds from `Text` to `Reference` as defined in
 // the initial version of the protocol.
-type CompletionItemKind int
+type CompletionItemKind uint32
 
 const (
 	// TextCompletion text completion kind.
@@ -305,7 +378,7 @@ func (k CompletionItemKind) String() string {
 	case TypeParameterCompletion:
 		return "TypeParameter"
 	default:
-		return strconv.FormatInt(int64(k), 10)
+		return strconv.FormatUint(uint64(k), 10)
 	}
 }
 
@@ -313,7 +386,7 @@ func (k CompletionItemKind) String() string {
 // item.
 //
 // @since 3.15.0.
-type CompletionItemTag float64
+type CompletionItemTag uint32
 
 // list of CompletionItemTag.
 const (
@@ -327,7 +400,7 @@ func (c CompletionItemTag) String() string {
 	case CompletionItemTagDeprecated:
 		return "Deprecated"
 	default:
-		return strconv.FormatFloat(float64(c), 'f', -10, 64)
+		return strconv.FormatUint(uint64(c), 10)
 	}
 }
 
@@ -387,7 +460,7 @@ type SignatureHelpParams struct {
 // SignatureHelpTriggerKind is the how a signature help was triggered.
 //
 // @since 3.15.0.
-type SignatureHelpTriggerKind float64
+type SignatureHelpTriggerKind uint32
 
 // list of SignatureHelpTriggerKind.
 const (
@@ -412,7 +485,7 @@ func (s SignatureHelpTriggerKind) String() string {
 	case SignatureHelpTriggerKindContentChange:
 		return "ContentChange"
 	default:
-		return strconv.FormatFloat(float64(s), 'f', -10, 64)
+		return strconv.FormatUint(uint64(s), 10)
 	}
 }
 
@@ -458,7 +531,7 @@ type SignatureHelp struct {
 	// In future version of the protocol this property might become
 	// mandatory to better express the active parameter if the
 	// active signature does have any.
-	ActiveParameter float64 `json:"activeParameter,omitempty"`
+	ActiveParameter uint32 `json:"activeParameter,omitempty"`
 
 	// ActiveSignature is the active signature. If omitted or the value lies outside the
 	// range of `signatures` the value defaults to zero or is ignored if
@@ -467,18 +540,28 @@ type SignatureHelp struct {
 	// rely on a default value.
 	// In future version of the protocol this property might become
 	// mandatory to better express this.
-	ActiveSignature float64 `json:"activeSignature,omitempty"`
+	ActiveSignature uint32 `json:"activeSignature,omitempty"`
 }
 
 // SignatureInformation is the client supports the following `SignatureInformation`
 // specific properties.
 type SignatureInformation struct {
-	// DocumentationFormat is the client supports the follow content formats for the documentation
-	// property. The order describes the preferred format of the client.
-	DocumentationFormat []MarkupKind `json:"documentationFormat,omitempty"`
+	// Label is the label of this signature. Will be shown in
+	// the UI.
+	Label string `json:"label"`
 
-	// ParameterInformation client capabilities specific to parameter information.
-	ParameterInformation *ParameterInformation `json:"parameterInformation,omitempty"`
+	// Documentation is the human-readable doc-comment of this signature. Will be shown
+	// in the UI but can be omitted.
+	Documentation interface{} `json:"documentation,omitempty"` // string | *MarkupContent
+
+	// Parameters is the parameters of this signature.
+	Parameters []ParameterInformation `json:"parameters,omitempty"`
+
+	// ActiveParameterSupport is the client supports the `activeParameter` property on
+	// `SignatureInformation` literal.
+	//
+	// @since 3.16.0.
+	ActiveParameter uint32 `json:"activeParameter,omitempty"`
 }
 
 // ParameterInformation represents a parameter of a callable-signature. A parameter can
@@ -488,15 +571,15 @@ type ParameterInformation struct {
 	//
 	// Either a string or an inclusive start and exclusive end offsets within its containing
 	// signature label. (see SignatureInformation.label). The offsets are based on a UTF-16
-	// string representation as `Position` and `Range` does.
+	// string representation as "Position" and "Range" does.
 	//
 	// *Note*: a label of type string should be a substring of its containing signature label.
-	// Its intended use case is to highlight the parameter label part in the `SignatureInformation.label`.
-	Label string `json:"label"`
+	// Its intended use case is to highlight the parameter label part in the "SignatureInformation.label".
+	Label string `json:"label"` // string | [uint32, uint32]
 
 	// Documentation is the human-readable doc-comment of this parameter. Will be shown
 	// in the UI but can be omitted.
-	Documentation interface{} `json:"documentation,omitempty"`
+	Documentation interface{} `json:"documentation,omitempty"` // string | MarkupContent
 }
 
 // SignatureHelpRegistrationOptions SignatureHelp Registration options.
@@ -533,7 +616,7 @@ type DocumentHighlight struct {
 }
 
 // DocumentHighlightKind a document highlight kind.
-type DocumentHighlightKind int
+type DocumentHighlightKind uint32
 
 const (
 	// Text a textual occurrence.
@@ -556,7 +639,7 @@ func (k DocumentHighlightKind) String() string {
 	case Write:
 		return "Write"
 	default:
-		return strconv.FormatInt(int64(k), 10)
+		return strconv.FormatUint(uint64(k), 10)
 	}
 }
 
@@ -578,7 +661,7 @@ type DocumentSymbolParams struct {
 // If this property is not present the client only supports
 // the symbol kinds from `File` to `Array` as defined in
 // the initial version of the protocol.
-type SymbolKind float64
+type SymbolKind uint32
 
 const (
 	// FileSymbol symbol of file.
@@ -691,7 +774,28 @@ func (k SymbolKind) String() string {
 	case TypeParameterSymbol:
 		return "TypeParameter"
 	default:
-		return strconv.FormatFloat(float64(k), 'f', -10, 64)
+		return strconv.FormatUint(uint64(k), 10)
+	}
+}
+
+// SymbolTag symbol tags are extra annotations that tweak the rendering of a symbol.
+//
+// @since 3.16.0.
+type SymbolTag uint32
+
+// list of SymbolTag.
+const (
+	// SymbolTagDeprecated render a symbol as obsolete, usually using a strike-out.
+	SymbolTagDeprecated SymbolTag = 1
+)
+
+// String returns a string representation of the SymbolTag.
+func (k SymbolTag) String() string {
+	switch k {
+	case SymbolTagDeprecated:
+		return "Deprecated"
+	default:
+		return strconv.FormatUint(uint64(k), 10)
 	}
 }
 
@@ -708,6 +812,11 @@ type DocumentSymbol struct {
 
 	// Kind is the kind of this symbol.
 	Kind SymbolKind `json:"kind"`
+
+	// Tags for this document symbol.
+	//
+	// @since 3.16.0.
+	Tags []SymbolTag `json:"tags,omitempty"`
 
 	// Deprecated indicates if this symbol is deprecated.
 	Deprecated bool `json:"deprecated,omitempty"`
@@ -732,7 +841,12 @@ type SymbolInformation struct {
 	Name string `json:"name"`
 
 	// Kind is the kind of this symbol.
-	Kind float64 `json:"kind"`
+	Kind SymbolKind `json:"kind"`
+
+	// Tags for this completion item.
+	//
+	// @since 3.16.0.
+	Tags []SymbolTag `json:"tags,omitempty"`
 
 	// Deprecated indicates if this symbol is deprecated.
 	Deprecated bool `json:"deprecated,omitempty"`
@@ -861,6 +975,25 @@ type CodeAction struct {
 	// @since 3.15.0.
 	IsPreferred bool `json:"isPreferred,omitempty"`
 
+	// Disabled marks that the code action cannot currently be applied.
+	//
+	// Clients should follow the following guidelines regarding disabled code
+	// actions:
+	//
+	//  - Disabled code actions are not shown in automatic lightbulbs code
+	//    action menus.
+	//
+	//  - Disabled actions are shown as faded out in the code action menu when
+	//    the user request a more specific type of code action, such as
+	//    refactorings.
+	//
+	//  - If the user has a keybinding that auto applies a code action and only
+	//    a disabled code actions are returned, the client should show the user
+	//    an error message with `reason` in the editor.
+	//
+	// @since 3.16.0.
+	Disabled *CodeActionDisable `json:"disabled,omitempty"`
+
 	// Edit is the workspace edit this code action performs.
 	Edit *WorkspaceEdit `json:"edit,omitempty"`
 
@@ -868,6 +1001,23 @@ type CodeAction struct {
 	// provides an edit and a command, first the edit is
 	// executed and then the command.
 	Command *Command `json:"command,omitempty"`
+
+	// Data is a data entry field that is preserved on a code action between
+	// a "textDocument/codeAction" and a "codeAction/resolve" request.
+	//
+	// @since 3.16.0.
+	Data interface{} `json:"data,omitempty"`
+}
+
+// CodeActionDisable Disable in CodeAction.
+//
+// @since 3.16.0.
+type CodeActionDisable struct {
+	// Reason human readable description of why the code action is currently
+	// disabled.
+	//
+	// This is displayed in the code actions UI.
+	Reason string `json:"reason"`
 }
 
 // CodeActionRegistrationOptions CodeAction Registrationi options.
@@ -927,7 +1077,7 @@ type DocumentLink struct {
 	Range Range `json:"range"`
 
 	// Target is the uri this link points to. If missing a resolve request is sent later.
-	Target uri.URI `json:"target,omitempty"`
+	Target DocumentURI `json:"target,omitempty"`
 
 	// Tooltip is the tooltip text when you hover over this link.
 	//
@@ -1024,7 +1174,7 @@ type FormattingOptions struct {
 	InsertSpaces bool `json:"insertSpaces"`
 
 	// TabSize size of a tab in spaces.
-	TabSize float64 `json:"tabSize"`
+	TabSize uint32 `json:"tabSize"`
 
 	// TrimTrailingWhitespace trim trailing whitespaces on a line.
 	//
@@ -1040,6 +1190,9 @@ type FormattingOptions struct {
 	//
 	// @since 3.15.0.
 	TrimFinalNewlines bool `json:"trimFinalNewlines,omitempty"`
+
+	// Key is the signature for further properties.
+	Key map[string]interface{} `json:"key,omitempty"` // bool | int32 | string
 }
 
 // DocumentRangeFormattingParams params of Document Range Formatting Request.
@@ -1133,16 +1286,16 @@ const (
 // Since 3.10.0.
 type FoldingRange struct {
 	// StartLine is the zero-based line number from where the folded range starts.
-	StartLine float64 `json:"startLine"`
+	StartLine uint32 `json:"startLine"`
 
 	// StartCharacter is the zero-based character offset from where the folded range starts. If not defined, defaults to the length of the start line.
-	StartCharacter float64 `json:"startCharacter,omitempty"`
+	StartCharacter uint32 `json:"startCharacter,omitempty"`
 
 	// EndLine is the zero-based line number where the folded range ends.
-	EndLine float64 `json:"endLine"`
+	EndLine uint32 `json:"endLine"`
 
 	// EndCharacter is the zero-based character offset before the folded range ends. If not defined, defaults to the length of the end line.
-	EndCharacter float64 `json:"endCharacter,omitempty"`
+	EndCharacter uint32 `json:"endCharacter,omitempty"`
 
 	// Kind describes the kind of the folding range such as `comment' or 'region'. The kind
 	// is used to categorize folding ranges and used by commands like 'Fold all comments'.

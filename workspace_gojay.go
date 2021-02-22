@@ -261,7 +261,7 @@ var (
 
 // MarshalJSONObject implements gojay.MarshalerJSONObject.
 func (v *FileEvent) MarshalJSONObject(enc *gojay.Encoder) {
-	enc.Float64Key(keyType, float64(v.Type))
+	enc.Uint32Key(keyType, uint32(v.Type))
 	enc.StringKey(keyURI, string(v.URI))
 }
 
@@ -272,7 +272,7 @@ func (v *FileEvent) IsNil() bool { return v == nil }
 func (v *FileEvent) UnmarshalJSONObject(dec *gojay.Decoder, k string) error {
 	switch k {
 	case keyType:
-		return dec.Float64((*float64)(&v.Type))
+		return dec.Uint32((*uint32)(&v.Type))
 	case keyURI:
 		return dec.String((*string)(&v.URI))
 	}
@@ -345,7 +345,7 @@ var (
 // MarshalJSONObject implements gojay.MarshalerJSONObject.
 func (v *FileSystemWatcher) MarshalJSONObject(enc *gojay.Encoder) {
 	enc.StringKey(keyGlobPattern, v.GlobPattern)
-	enc.Float64KeyOmitEmpty(keyKind, float64(v.Kind))
+	enc.Uint32KeyOmitEmpty(keyKind, uint32(v.Kind))
 }
 
 // IsNil returns wether the structure is nil value or not.
@@ -357,7 +357,7 @@ func (v *FileSystemWatcher) UnmarshalJSONObject(dec *gojay.Decoder, k string) er
 	case keyGlobPattern:
 		return dec.String(&v.GlobPattern)
 	case keyKind:
-		return dec.Float64((*float64)(&v.Kind))
+		return dec.Uint32((*uint32)(&v.Kind))
 	}
 	return nil
 }
@@ -492,6 +492,8 @@ var (
 // MarshalJSONObject implements gojay.MarshalerJSONObject.
 func (v *ApplyWorkspaceEditResponse) MarshalJSONObject(enc *gojay.Encoder) {
 	enc.BoolKey(keyApplied, v.Applied)
+	enc.StringKeyOmitEmpty(keyFailureReason, v.FailureReason)
+	enc.Uint32KeyOmitEmpty(keyFailedChange, v.FailedChange)
 }
 
 // IsNil returns wether the structure is nil value or not.
@@ -499,14 +501,19 @@ func (v *ApplyWorkspaceEditResponse) IsNil() bool { return v == nil }
 
 // UnmarshalJSONObject implements gojay's UnmarshalerJSONObject.
 func (v *ApplyWorkspaceEditResponse) UnmarshalJSONObject(dec *gojay.Decoder, k string) error {
-	if k == keyApplied {
+	switch k {
+	case keyApplied:
 		return dec.Bool(&v.Applied)
+	case keyFailureReason:
+		return dec.String(&v.FailureReason)
+	case keyFailedChange:
+		return dec.Uint32(&v.FailedChange)
 	}
 	return nil
 }
 
 // NKeys returns the number of keys to unmarshal.
-func (v *ApplyWorkspaceEditResponse) NKeys() int { return 1 }
+func (v *ApplyWorkspaceEditResponse) NKeys() int { return 3 }
 
 // compile time check whether the ApplyWorkspaceEditResponse implements a gojay.MarshalerJSONObject and gojay.UnmarshalerJSONObject interfaces.
 var (

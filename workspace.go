@@ -75,7 +75,7 @@ type FileEvent struct {
 }
 
 // FileChangeType is the file event type.
-type FileChangeType float64
+type FileChangeType uint32
 
 const (
 	// Created is the file got created.
@@ -96,7 +96,7 @@ func (t FileChangeType) String() string {
 	case Deleted:
 		return "Deleted"
 	default:
-		return strconv.FormatFloat(float64(t), 'f', -10, 64)
+		return strconv.FormatUint(uint64(t), 10)
 	}
 }
 
@@ -126,7 +126,7 @@ type FileSystemWatcher struct {
 }
 
 // WatchKind kind of FileSystemWatcher kind.
-type WatchKind float64
+type WatchKind uint32
 
 const (
 	// CreateWatch interested in create events.
@@ -149,7 +149,7 @@ func (k WatchKind) String() string {
 	case DeleteWatch:
 		return "Delete"
 	default:
-		return strconv.FormatFloat(float64(k), 'f', -10, 64)
+		return strconv.FormatUint(uint64(k), 10)
 	}
 }
 
@@ -196,4 +196,15 @@ type ApplyWorkspaceEditParams struct {
 type ApplyWorkspaceEditResponse struct {
 	// Applied indicates whether the edit was applied or not.
 	Applied bool `json:"applied"`
+
+	// FailureReason an optional textual description for why the edit was not applied.
+	// This may be used by the server for diagnostic logging or to provide
+	// a suitable error for a request that triggered the edit.
+	FailureReason string `json:"failureReason,omitempty"`
+
+	// FailedChange depending on the client's failure handling strategy "failedChange"
+	// might contain the index of the change that failed. This property is
+	// only available if the client signals a "failureHandlingStrategy"
+	// in its client capabilities.
+	FailedChange uint32 `json:"failedChange,omitempty"`
 }
